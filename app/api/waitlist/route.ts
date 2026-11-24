@@ -18,14 +18,20 @@ function optionalText(value: unknown, maxLength: number): string | null {
 }
 
 export async function POST(request: Request) {
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  if (contentLength > 8 * 1024) {
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ ok: false, message: "Invalid request body" }, { status: 400 });
+  }
+
+  if (new TextEncoder().encode(rawBody).byteLength > 8 * 1024) {
     return NextResponse.json({ ok: false, message: "Request is too large" }, { status: 413 });
   }
 
   let payload: WaitlistPayload;
   try {
-    payload = await request.json();
+    payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ ok: false, message: "Invalid JSON request" }, { status: 400 });
   }
