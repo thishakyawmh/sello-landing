@@ -170,16 +170,16 @@ export default function LandingPage() {
             <h3 className="text-2xl font-bold text-white">Get early access to Sello</h3>
             <p className="text-neutral-400 mt-2">Join the waitlist and get a chance for a free onboarding session.</p>
 
-            <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
-              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
-              <input value={business} onChange={(e) => setBusiness(e.target.value)} placeholder="Business type (e.g., bakery)" className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
+            <form onSubmit={handleSubmit} aria-label="Sello waitlist signup" className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" autoComplete="name" maxLength={120} className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" maxLength={254} className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
+              <input value={business} onChange={(e) => setBusiness(e.target.value)} placeholder="Business type (e.g., bakery)" maxLength={120} className="p-3 rounded-md bg-neutral-900 border border-neutral-800 focus:ring-2 focus:ring-orange-400 outline-none" required />
 
               <div className="md:col-span-3 mt-2">
                 <div className="flex items-center justify-center gap-4">
-                  <Button type="submit" className="px-6 py-3 bg-gradient-to-r from-orange-400 via-pink-500 to-rose-500 text-neutral-900 font-semibold rounded-lg shadow-lg hover:scale-105 transition-transform">Join Waitlist</Button>
+                  <Button type="submit" disabled={status === "loading"} className="px-6 py-3 bg-gradient-to-r from-orange-400 via-pink-500 to-rose-500 text-neutral-900 font-semibold rounded-lg shadow-lg hover:scale-105 transition-transform">Join Waitlist</Button>
                 </div>
-                <div className="mt-3 text-sm text-neutral-400">
+                <div role="status" aria-live="polite" className="mt-3 text-sm text-neutral-400">
                   {status === "loading" && "Submitting..."}
                   {status === "ok" && <span className="text-green-400">Thanks — we’ll email you soon!</span>}
                   {status === "error" && <span className="text-rose-400">Submission failed — try again.</span>}
