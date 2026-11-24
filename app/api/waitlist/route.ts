@@ -1,56 +1,81 @@
-import fs from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
 
-// Updated type with createdAt included
-type Payload = {
-  email: string;
-  name?: string;
-  business?: string;
-  createdAt?: string;
+type WaitlistPayload = {
+  email?: unknown;
+  name?: unknown;
+  business?: unknown;
 };
 
-export async function POST(req: Request) {
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function optionalText(value: unknown, maxLength: number): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) return null;
+  return normalized;
+}
+
+export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 8 * 1024) {
+    return NextResponse.json({ ok: false, message: "Request is too large" }, { status: 413 });
+  }
+
+  let payload: WaitlistPayload;
   try {
-    const payload: Payload = await req.json();
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, message: "Invalid JSON request" }, { status: 400 });
+  }
 
-    // Validate email
-    if (!payload?.email) {
-      return NextResponse.json(
-        { ok: false, message: "Email required" },
-        { status: 400 }
-      );
-    }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return NextResponse.json({ ok: false, message: "Invalid request body" }, { status: 400 });
+  }
 
-    // Prepare file location
-    const file = path.join(process.cwd(), "waitlist_temp.json");
-    let list: Payload[] = [];
+  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+  if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    return NextResponse.json({ ok: false, message: "Enter a valid email address" }, { status: 400 });
+  }
 
-    // Load existing file if available
-    if (fs.existsSync(file)) {
-      try {
-        list = JSON.parse(fs.readFileSync(file, "utf8"));
-      } catch {
-        list = [];
-      }
-    }
+  const name = optionalText(payload.name, 120);
+  const business = optionalText(payload.business, 120);
+  if ((payload.name && !name) || (payload.business && !business)) {
+    return NextResponse.json({ ok: false, message: "Name and business type must be 120 characters or fewer" }, { status: 400 });
+  }
 
-    // Push new entry
-    list.push({
-      ...payload,
-      createdAt: new Date().toISOString(),
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return NextResponse.json(
+      { ok: false, message: "Waitlist storage is not configured yet" },
+      { status: 503 }
+    );
+  }
+
+  try {
+    const endpoint = new URL("/rest/v1/waitlist_signups?on_conflict=email", supabaseUrl);
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=ignore-duplicates,return=minimal",
+      },
+      body: JSON.stringify({ email, name, business }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
 
-    // Save back to file
-    fs.writeFileSync(file, JSON.stringify(list, null, 2));
+    if (!response.ok) {
+      console.error("Waitlist storage request failed with status:", response.status);
+      return NextResponse.json({ ok: false, message: "Unable to save your request right now" }, { status: 502 });
+    }
 
-    // Success response
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("Waitlist API Error:", err);
-    return NextResponse.json(
-      { ok: false, message: "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch {
+    return NextResponse.json({ ok: false, message: "Unable to save your request right now" }, { status: 502 });
   }
 }
