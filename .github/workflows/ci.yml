@@ -1,0 +1,25 @@
+name: Sello CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master, "audit/**"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Report dependency advisories
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e 'const a=require("./npm-audit.json"); console.log("Dependency advisories:", JSON.stringify(a.metadata?.vulnerabilities || {}));'
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
